@@ -1,94 +1,68 @@
-from fastapi import FastAPI, Depends, HTTPException
-from sqlmodel import Field, SQLModel, create_engine, Session, select
-from todo_app import setting
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
-connection_string: str = str(setting.DATABASE_URL).replace(
-    "postgresql", "postgresql+psycopg"
+from .utils.database import create_db_and_tables
+from .api import (
+    auth_router,
+    chat_router,
+    memory_router,
+    healing_router,
+    ai_router,
+    dashboard_router,
 )
-
-engine = create_engine(
-    connection_string,
-    connect_args={"sslmode": "require"},
-    pool_recycle=300,
-    pool_size=10,
-    echo=True,
-)
-
-
-class Todo(SQLModel, table=True):
-    id: int | None = Field(default=None, primary_key=True)
-    content: str = Field(index=True, min_length=3, max_length=60)
-    is_completed: bool = Field(default=False)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    SQLModel.metadata.create_all(engine)
+    """Application lifespan manager."""
+    # Create database tables on startup
+    create_db_and_tables()
     yield
 
 
-app: FastAPI = FastAPI(lifespan=lifespan)
+app = FastAPI(
+    title="After Us - Breakup Healing Assistant",
+    description="An AI-powered platform to help users heal from breakups by analyzing conversations and providing therapeutic guidance.",
+    version="1.0.0",
+    lifespan=lifespan,
+)
 
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # In production, specify exact origins
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-def with_session():
-    with Session(engine) as session:
-        yield session
+# Include routers
+app.include_router(auth_router)
+app.include_router(chat_router)
+app.include_router(memory_router)
+app.include_router(healing_router)
+app.include_router(ai_router)
+app.include_router(dashboard_router)
 
 
 @app.get("/")
-def root():
-    return {"message": "Hello World"}
-
-
-@app.post(
-    "/todos",
-    response_model=Todo,
-)
-async def create_todo(todo: Todo, session: Session = Depends(with_session)):
-    session.add(todo)
-    session.commit()
-    session.refresh(todo)
-    return todo
-
-
-@app.get("/todos", response_model=list[Todo])
-def get_todos(session: Session = Depends(with_session)):
-    todos = session.exec(select(Todo)).all()
-    return todos
-
-
-@app.get("/todos/{todo_id}", response_model=Todo)
-def get_todo(todo_id: int, session: Session = Depends(with_session)):
-    select_query = select(Todo).where(Todo.id == todo_id)
-    todo = session.exec(select_query).first()
-    if not todo:
-        raise HTTPException(status_code=404, detail="Todo not found")
-    return todo
-
-
-@app.patch("/todos/{todo_id}", response_model=Todo)
-def update_todo(todo_id: int, todo: Todo, session: Session = Depends(with_session)):
-    select_query = select(Todo).where(Todo.id == todo_id)
-    existing = session.exec(select_query).first()
-    if not existing:
-        raise HTTPException(status_code=404, detail="Todo not found")
-    existing.content = todo.content
-    existing.is_completed = todo.is_completed
-    session.add(existing)
-    session.commit()
-    session.refresh(existing)
-    return existing
-
-
-@app.delete("/todos/{todo_id}")
-def delete_todo(todo_id: int, session: Session = Depends(with_session)):
-    select_query = select(Todo).where(Todo.id == todo_id)
-    todo = session.exec(select_query).first()
-    if not todo:
-        raise HTTPException(status_code=404, detail="Todo not found")
-    session.delete(todo)
-    session.commit()
+async def root():
+    """Root endpoint - health check."""
     return {
-        "message": "Todo deleted successfully",
+        "message": "Welcome to After Us - Your Breakup Healing Assistant",
+        "status": "healthy",
+        "version": "1.0.0",
     }
+
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint."""
+    return {"status": "healthy"}
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(app, host="0.0.0.0", port=8000)
