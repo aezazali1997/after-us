@@ -10,6 +10,7 @@ from .api import (
     healing_router,
     ai_router,
     dashboard_router,
+    user_router,
 )
 
 
@@ -44,6 +45,7 @@ app.include_router(memory_router)
 app.include_router(healing_router)
 app.include_router(ai_router)
 app.include_router(dashboard_router)
+app.include_router(user_router)
 
 
 @app.get("/")

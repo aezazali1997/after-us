@@ -1,59 +1,43 @@
+
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlmodel import Session, select
 from typing import List, Optional
 from datetime import datetime
 from ..models.user import User
-from ..models.memory import Memory, MemoryType
+from ..models.journal import Journal 
 from ..models.chat import ChatSession, ParsedMessage
-from ..schemas.memory import CreateMemoryRequest, UpdateMemoryRequest, MemoryResponse
+from ..schemas.journal import CreateJournalRequest, UpdateJournalRequest, JournalResponse
 from ..schemas.common import StatusResponse
 from ..utils.auth import get_current_user
 from ..utils.database import get_session
 
-router = APIRouter(prefix="/memories", tags=["Memory"])
+router = APIRouter(prefix="/journals", tags=["Journal"])
 
 
-@router.get("", response_model=List[MemoryResponse])
-async def get_memories(
-    type: Optional[str] = Query(None, description="Filter by memory type"),
+@router.get("", response_model=List[JournalResponse])
+async def get_journals(
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    """Get user's memories with optional filtering."""
-    query = select(Memory).where(Memory.user_id == current_user.id)
+    """Get user's Journals."""
+    query = select(Journal).where(Journal.user_id == current_user.id)
 
-    if type:
-        try:
-            memory_type = MemoryType(type)
-            query = query.where(Memory.type == memory_type)
-        except ValueError:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Invalid memory type: {type}",
-            )
-
+   
     query = query.offset(offset).limit(limit)
-    memories = session.exec(query).all()
+    journals = session.exec(query).all()
 
     return [
-        MemoryResponse(
-            id=memory.id,
-            user_id=memory.user_id,
-            title=memory.title,
+        JournalResponse(
+            id=journal.id,
+            user_id=memojournalry.user_id,
             description=memory.description,
             date=memory.date,
-            type=memory.type,
-            mood=memory.mood,
-            extractedFromChat = memory.extracted_from_chat,
-            chatSessionId = memory.chat_session_id,
-            participants=memory.participants,
-            image_url=memory.image_url,
             created_at=memory.created_at,
             updated_at=memory.updated_at,
         )
-        for memory in memories
+        for journal in Journals
     ]
 
 
