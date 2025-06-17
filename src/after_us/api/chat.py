@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlmodel import Session, select
+import re
 from typing import List
 import json
 import re
@@ -20,36 +21,46 @@ router = APIRouter(prefix="/chat", tags=["Chat"])
 
 
 def parse_whatsapp_export(content: str, user_name: str) -> List[dict]:
-    """Parse WhatsApp chat export content."""
     messages = []
     lines = content.split("\n")
 
-    # Regular expression for WhatsApp message format
-    # Format: [DD/MM/YYYY, HH:MM:SS] Sender: Message
-    pattern = r"\[(\d{1,2}/\d{1,2}/\d{4}, \d{1,2}:\d{2}:\d{2})\] ([^:]+): (.+)"
+    # WhatsApp format: [DD/MM/YYYY, HH:MM AM/PM] Name: Message
+    pattern = r"(\d{1,2}/\d{1,2}/\d{4}, \d{1,2}:\d{2}(?::\d{2})?\s*[APMapm]{2})\s*-\s*([^:]+):\s*(.+)"
 
     for line in lines:
-        match = re.match(pattern, line.strip())
-        if match:
-            timestamp_str, sender, content = match.groups()
-            try:
-                timestamp = datetime.strptime(timestamp_str, "%d/%m/%Y, %H:%M:%S")
-                is_user = sender.strip() == user_name.strip()
+        line = line.strip()
+        if not line:
+            continue
 
-                messages.append(
-                    {
-                        "timestamp": timestamp,
-                        "sender": sender.strip(),
-                        "content": content.strip(),
-                        "is_user": is_user,
-                    }
-                )
+        match = re.match(pattern, line)
+        if match:
+            timestamp_str, sender, message_content = match.groups()
+
+            # Normalize unicode whitespace characters
+            timestamp_str = re.sub(r'\s+', ' ', timestamp_str).strip()
+
+            # Parse timestamp
+            try:
+                if timestamp_str.count(":") == 2:
+                    timestamp = datetime.strptime(timestamp_str, "%d/%m/%Y, %I:%M:%S %p")
+                else:
+                    timestamp = datetime.strptime(timestamp_str, "%d/%m/%Y, %I:%M %p")
             except ValueError:
-                continue  # Skip invalid timestamp formats
+                continue  # Skip badly formatted timestamps
+
+            is_user = sender.strip() == user_name.strip()
+
+            messages.append(
+                {
+                    "timestamp": timestamp,
+                    "sender": sender.strip(),
+                    "content": message_content.strip(),
+                    "is_user": is_user,
+                }
+            )
+
 
     return messages
-
-
 @router.post("/upload", response_model=ChatSessionResponse)
 async def upload_chat(
     file: UploadFile = File(...),
@@ -67,8 +78,10 @@ async def upload_chat(
         content = await file.read()
         text_content = content.decode("utf-8")
 
+
         # Parse messages
         parsed_messages = parse_whatsapp_export(text_content, current_user.name)
+
 
         if not parsed_messages:
             raise HTTPException(
