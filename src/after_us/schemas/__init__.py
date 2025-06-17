@@ -5,3 +5,5 @@ from .healing import *
 from .ai import *
 from .dashboard import *
 from .common import *
+from .journal import *
+from .user import *

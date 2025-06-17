@@ -1,39 +1,27 @@
-from pydantic import BaseModel, EmailStr, Field
-from datetime import datetime
+from pydantic import BaseModel, EmailStr
 from typing import Optional
-
-
-class UserRegistrationRequest(BaseModel):
-    email: EmailStr
-    password: str = Field(min_length=6)
-    name: str
-
-
-class UserLoginRequest(BaseModel):
-    email: EmailStr
-    password: str
+from datetime import datetime
 
 
 class UserResponse(BaseModel):
     id: int
-    email: str
+    email: EmailStr
     name: str
-    created_at: datetime
     is_active: bool
-    profile_picture: Optional[str] = None
-    ex_name: Optional[str] = None
-    ex_picture:  Optional[str] = None
-    ex_nickname: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        orm_mode = True
 
 
-class AuthResponse(BaseModel):
-    user: UserResponse
-    access_token: str
-    token_type: str = "bearer"
+class CreateUserRequest(BaseModel):
+    email: EmailStr
+    name: str
+    password: str  # this will be hashed before storing
 
+    class Config:
+        orm_mode = True
 
-class TokenData(BaseModel):
-    user_id: Optional[int] = None
 
 class UpdateUserRequest(BaseModel):
     email: Optional[EmailStr] = None
