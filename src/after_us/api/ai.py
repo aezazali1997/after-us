@@ -15,6 +15,7 @@ from ..schemas.ai import (
 from ..schemas.chat import ChatInsightsResponse
 from ..utils.auth import get_current_user
 from ..utils.database import get_session
+from ..claude.talk import get_response
 
 router = APIRouter(prefix="/ai", tags=["AI"])
 
@@ -65,71 +66,76 @@ async def ai_chat(
     session: Session = Depends(get_session),
 ):
     """AI chat conversation with user."""
-    # Get user's AI personality settings
-    personality = session.exec(
-        select(AIPersonality).where(AIPersonality.user_id == current_user.id)
-    ).first()
-
-    context_messages = None
-    if chat_request.context_session_id:
-        # Get context from specific chat session
-        context_messages = session.exec(
-            select(ParsedMessage)
-            .where(ParsedMessage.session_id == chat_request.context_session_id)
-            .limit(10)  # Last 10 messages for context
-        ).all()
-
-    # Generate AI response
-    ai_response = generate_ai_response(
-        chat_request.message, personality, context_messages
-    )
-
-    # Analyze emotion (simplified)
-    emotion = None
-    message_lower = chat_request.message.lower()
-    if any(word in message_lower for word in ["sad", "hurt", "pain"]):
-        emotion = "sad"
-    elif any(word in message_lower for word in ["angry", "mad", "furious"]):
-        emotion = "angry"
-    elif any(word in message_lower for word in ["happy", "good", "better"]):
-        emotion = "positive"
-    elif any(word in message_lower for word in ["confused", "lost", "don't know"]):
-        emotion = "confused"
-
-    # Suggest actions based on emotion
-    suggested_actions = []
-    if emotion == "sad":
-        suggested_actions = [
-            "Practice self-compassion",
-            "Write in a journal",
-            "Take a walk in nature",
-        ]
-    elif emotion == "angry":
-        suggested_actions = [
-            "Try deep breathing exercises",
-            "Do some physical exercise",
-            "Write an unsent letter",
-        ]
-    elif emotion == "confused":
-        suggested_actions = [
-            "List your feelings",
-            "Talk to a trusted friend",
-            "Consider professional counseling",
-        ]
-
-    context_used = {}
-    if context_messages:
-        context_used = {
-            "session_id": chat_request.context_session_id,
-            "messages_analyzed": len(context_messages),
-        }
-
+    res=get_response(chat_request.message) 
     return AIChatResponse(
-        response=ai_response,
-        emotion=emotion,
-        suggested_actions=suggested_actions,
-        context_used=context_used,
+        response=res,
     )
+
+    # Get user's AI personality settings
+    # personality = session.exec(
+    #     select(AIPersonality).where(AIPersonality.user_id == current_user.id)
+    # ).first()
+
+    # context_messages = None
+    # if chat_request.context_session_id:
+    #     # Get context from specific chat session
+    #     context_messages = session.exec(
+    #         select(ParsedMessage)
+    #         .where(ParsedMessage.session_id == chat_request.context_session_id)
+    #         .limit(10)  # Last 10 messages for context
+    #     ).all()
+
+    # # Generate AI response
+    # ai_response = generate_ai_response(
+    #     chat_request.message, personality, context_messages
+    # )
+
+    # # Analyze emotion (simplified)
+    # emotion = None
+    # message_lower = chat_request.message.lower()
+    # if any(word in message_lower for word in ["sad", "hurt", "pain"]):
+    #     emotion = "sad"
+    # elif any(word in message_lower for word in ["angry", "mad", "furious"]):
+    #     emotion = "angry"
+    # elif any(word in message_lower for word in ["happy", "good", "better"]):
+    #     emotion = "positive"
+    # elif any(word in message_lower for word in ["confused", "lost", "don't know"]):
+    #     emotion = "confused"
+
+    # # Suggest actions based on emotion
+    # suggested_actions = []
+    # if emotion == "sad":
+    #     suggested_actions = [
+    #         "Practice self-compassion",
+    #         "Write in a journal",
+    #         "Take a walk in nature",
+    #     ]
+    # elif emotion == "angry":
+    #     suggested_actions = [
+    #         "Try deep breathing exercises",
+    #         "Do some physical exercise",
+    #         "Write an unsent letter",
+    #     ]
+    # elif emotion == "confused":
+    #     suggested_actions = [
+    #         "List your feelings",
+    #         "Talk to a trusted friend",
+    #         "Consider professional counseling",
+    #     ]
+
+    # context_used = {}
+    # if context_messages:
+    #     context_used = {
+    #         "session_id": chat_request.context_session_id,
+    #         "messages_analyzed": len(context_messages),
+    #     }
+
+    # return AIChatResponse(
+    #     response=ai_response,
+    #     emotion=emotion,
+    #     suggested_actions=suggested_actions,
+    #     context_used=context_used,
+    # )
 
 
 @router.get("/insights/{session_id}", response_model=ChatInsightsResponse)
