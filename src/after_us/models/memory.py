@@ -28,3 +28,6 @@ class Memory(SQLModel, table=True):
     image_url: Optional[str] = Field(default=None, max_length=500)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+    extracted_from_chat: Optional[bool] = False
+    chat_session_id: Optional[int] = None
+

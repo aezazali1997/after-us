@@ -11,8 +11,10 @@ class CreateMemoryRequest(BaseModel):
     date: Date
     type: MemoryType = MemoryType.OTHER
     mood: Optional[str] = None
-    participants: str
+    participants: list[str]
     image_url: Optional[str] = None
+    extracted_from_chat: Optional[bool] = False
+    chatSessionId: Optional[int] = None
 
 
 class UpdateMemoryRequest(BaseModel):
@@ -23,6 +25,8 @@ class UpdateMemoryRequest(BaseModel):
     mood: Optional[str] = None
     participants: Optional[str] = None
     image_url: Optional[str] = None
+    extracted_from_chat: Optional[bool] = False
+    chat_session_id: Optional[int] = None
 
 
 class MemoryResponse(BaseModel):
@@ -37,3 +41,5 @@ class MemoryResponse(BaseModel):
     image_url: Optional[str]
     created_at: datetime
     updated_at: datetime
+    extracted_from_chat: Optional[bool] = False
+    chat_session_id: Optional[int] = None

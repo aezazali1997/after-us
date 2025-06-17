@@ -61,7 +61,8 @@ async def register(
             email=user.email,
             name=user.name,
             created_at=user.created_at,
-            is_active=user.is_active,
+            is_active=user.is_active
+
         ),
         access_token=access_token,
     )
@@ -90,6 +91,10 @@ async def login(user_data: UserLoginRequest, session: Session = Depends(get_sess
             name=user.name,
             created_at=user.created_at,
             is_active=user.is_active,
+            profile_picture=user.profile_picture,
+            ex_name=user.ex_name, 
+            ex_picture=user.ex_picture,
+            ex_nickname=user.ex_nickname,
         ),
         access_token=access_token,
     )

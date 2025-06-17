@@ -10,3 +10,8 @@ class User(SQLModel, table=True):
     hashed_password: str = Field(max_length=255)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     is_active: bool = Field(default=True)
+    profile_picture: Optional[str] = Field(default=None, max_length=255)
+    ex_name: Optional[str] = Field(default=None, max_length=255)
+    ex_picture: Optional[str] = Field(default=None, max_length=255)
+    ex_nickname: Optional[str] = Field(default=None, max_length=255)
+
