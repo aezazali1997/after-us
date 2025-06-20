@@ -150,6 +150,8 @@ async def get_chat_sessions(
 
     chat_sessions = session.exec(sessions_query).all()
 
+
+
     return [
         ChatSessionResponse(
             id=cs.id,

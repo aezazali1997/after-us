@@ -12,3 +12,4 @@ DATABASE_URL = config(
     cast=Secret,
     default="postgresql://user:password@localhost:5432/after_us",
 )
+GEMINI_API_KEY = config("GEMINI_API_KEY", cast=Secret)

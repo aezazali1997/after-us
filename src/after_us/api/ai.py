@@ -15,7 +15,10 @@ from ..schemas.ai import (
 from ..schemas.chat import ChatInsightsResponse
 from ..utils.auth import get_current_user
 from ..utils.database import get_session
-from ..claude.talk import get_response
+from ..utils.Toneenum import ToneEnum
+from google import genai
+from ..config import GEMINI_API_KEY
+
 
 router = APIRouter(prefix="/ai", tags=["AI"])
 
@@ -25,38 +28,63 @@ def generate_ai_response(
     personality: AIPersonality = None,
     context_messages: List[ParsedMessage] = None,
 ) -> str:
-    """Generate AI response based on user input and context."""
-    # This is a simplified AI response generator
-    # In a real implementation, this would integrate with an AI service like OpenAI GPT
 
-    base_response = "I understand how you're feeling. "
+    client = genai.Client(api_key=f"{GEMINI_API_KEY}")
+
+
+    system_instruction = """You are an emotionally intelligent AI assistant designed to act like a supportive and insightful companion. Your role is to engage with the user as if you were a real person with deep empathy, clarity, and wisdom.
+
+Your responses should always feel emotionally safe, relatable, and human. Adapt your tone based on the context — be calm and reassuring if the user is in distress, light and engaging if the user is casual, and motivating when the user seeks productivity or growth.
+
+When asked emotional or personal questions, prioritize validation, thoughtful reflection, and positive guidance over cold analysis. Be comfortable talking about complex human emotions, confusion, past relationship struggles, productivity issues, and inner conflict.
+
+Do not ask generic questions like "How can I help you today?" Instead, be proactive. If the user seems overwhelmed, offer a way to breathe or break down the situation. If the user is stuck in thought loops, help them name their feelings and refocus.
+
+Avoid robotic behavior. Don't say "I'm just an AI." Speak like a human who understands. Use analogies, emotional language, and brief silence cues (like “...”) when it adds depth.
+
+Do not offer clinical diagnoses, medical advice, or therapy. Never suggest anything unsafe or dismissive.
+
+Your personality may change based on user-chosen personas (e.g., a caring older sister, a calm mentor, or a witty friend). But always stay consistent in your emotional intelligence and emotional safety principles.
+
+Your goal is not just to answer — it's to **connect**.
+"""
+
 
     if personality:
-        if personality.tone == "supportive":
-            base_response += "Remember that healing takes time, and you're doing great by taking this step. "
-        elif personality.tone == "empathetic":
-            base_response += (
-                "I can feel the emotion in your words, and that's completely valid. "
+        if personality.tone == ToneEnum.SUPPORTIVE:
+            system_instruction += (
+                " Respond with a supportive tone. Encourage healing and self-compassion."
             )
-        elif personality.tone == "challenging":
-            base_response += "Let's think about this differently - what would your stronger self do? "
+        elif personality.tone == ToneEnum.EMPATHETIC:
+            system_instruction += (
+                " Respond with an empathetic tone. Acknowledge emotions and validate them."
+            )
+        elif personality.tone == ToneEnum.CHALLENGING:
+            system_instruction += (
+                " Respond with a challenging but constructive tone. Help the user reframe their perspective."
+            )
 
-    # Simple keyword-based responses
-    message_lower = message.lower()
-    if any(word in message_lower for word in ["sad", "hurt", "pain"]):
-        base_response += "It's natural to feel this way after a relationship ends. These feelings are part of the healing process."
-    elif any(word in message_lower for word in ["angry", "mad", "furious"]):
-        base_response += "Anger is often a secondary emotion that masks hurt. It's okay to feel angry, but let's explore what's underneath."
-    elif any(word in message_lower for word in ["miss", "lonely", "alone"]):
-        base_response += "Missing someone shows how much they meant to you. This feeling will soften with time."
-    elif any(word in message_lower for word in ["future", "move on", "forward"]):
-        base_response += "Looking forward is a positive sign. You're already on the path to healing and growth."
-    else:
-        base_response += (
-            "Thank you for sharing that with me. Your feelings are valid and important."
+       # Add conversation history if any
+    print("context_messages:", context_messages)
+    history = personality.relationship_context
+    if context_messages:
+        for msg in context_messages:
+            history += f"User: {msg.user_message}\nAI: {msg.ai_response}\n"
+
+    final_prompt = f"""{system_instruction}
+        {history}
+    User: {message}
+    AI:"""
+
+    try:
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=final_prompt,
         )
-
-    return base_response
+        return response.text.strip()
+    except Exception as e:
+        # fallback or error response
+        return "I'm sorry, I wasn't able to generate a response right now."
 
 
 @router.post("/chat", response_model=AIChatResponse)
@@ -65,77 +93,75 @@ async def ai_chat(
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    """AI chat conversation with user."""
-    res=get_response(chat_request.message) 
-    return AIChatResponse(
-        response=res,
-    )
+    personality = session.exec(
+        select(AIPersonality).where(AIPersonality.user_id == current_user.id)
+    ).first()
 
-    # Get user's AI personality settings
-    # personality = session.exec(
-    #     select(AIPersonality).where(AIPersonality.user_id == current_user.id)
-    # ).first()
 
+
+    context_messages = []
     # context_messages = None
-    # if chat_request.context_session_id:
-    #     # Get context from specific chat session
-    #     context_messages = session.exec(
-    #         select(ParsedMessage)
-    #         .where(ParsedMessage.session_id == chat_request.context_session_id)
-    #         .limit(10)  # Last 10 messages for context
-    #     ).all()
+    if chat_request.context_session_id:
+        # Get context from specific chat session
+        context_messages = session.exec(
+            select(ParsedMessage)
+            .where(ParsedMessage.session_id == chat_request.context_session_id)
+            .limit(10)  # Last 10 messages for context
+        ).all()
 
     # # Generate AI response
-    # ai_response = generate_ai_response(
-    #     chat_request.message, personality, context_messages
-    # )
+    ai_response = generate_ai_response(
+        chat_request.message, personality, context_messages
+    )
 
-    # # Analyze emotion (simplified)
-    # emotion = None
-    # message_lower = chat_request.message.lower()
-    # if any(word in message_lower for word in ["sad", "hurt", "pain"]):
-    #     emotion = "sad"
-    # elif any(word in message_lower for word in ["angry", "mad", "furious"]):
-    #     emotion = "angry"
-    # elif any(word in message_lower for word in ["happy", "good", "better"]):
-    #     emotion = "positive"
-    # elif any(word in message_lower for word in ["confused", "lost", "don't know"]):
-    #     emotion = "confused"
+    # Analyze emotion (simplified)
+    emotion = None
+    message_lower = chat_request.message.lower()
+    if any(word in message_lower for word in ["sad", "hurt", "pain"]):
+        emotion = "sad"
+    elif any(word in message_lower for word in ["angry", "mad", "furious"]):
+        emotion = "angry"
+    elif any(word in message_lower for word in ["happy", "good", "better"]):
+        emotion = "positive"
+    elif any(word in message_lower for word in ["confused", "lost", "don't know"]):
+        emotion = "confused"
 
-    # # Suggest actions based on emotion
-    # suggested_actions = []
-    # if emotion == "sad":
-    #     suggested_actions = [
-    #         "Practice self-compassion",
-    #         "Write in a journal",
-    #         "Take a walk in nature",
-    #     ]
-    # elif emotion == "angry":
-    #     suggested_actions = [
-    #         "Try deep breathing exercises",
-    #         "Do some physical exercise",
-    #         "Write an unsent letter",
-    #     ]
-    # elif emotion == "confused":
-    #     suggested_actions = [
-    #         "List your feelings",
-    #         "Talk to a trusted friend",
-    #         "Consider professional counseling",
-    #     ]
+    # Suggest actions based on emotion
+    suggested_actions = []
+    if emotion == "sad":
+        suggested_actions = [
+            "Practice self-compassion",
+            "Write in a journal",
+            "Take a walk in nature",
+        ]
+    elif emotion == "angry":
+        suggested_actions = [
+            "Try deep breathing exercises",
+            "Do some physical exercise",
+            "Write an unsent letter",
+        ]
+    elif emotion == "confused":
+        suggested_actions = [
+            "List your feelings",
+            "Talk to a trusted friend",
+            "Consider professional counseling",
+        ]
 
-    # context_used = {}
-    # if context_messages:
-    #     context_used = {
-    #         "session_id": chat_request.context_session_id,
-    #         "messages_analyzed": len(context_messages),
-    #     }
+    context_used = {}
+    if context_messages:
+        context_used = {
+            "session_id": chat_request.context_session_id,
+            "messages_analyzed": len(context_messages),
+        }
 
-    # return AIChatResponse(
-    #     response=ai_response,
-    #     emotion=emotion,
-    #     suggested_actions=suggested_actions,
-    #     context_used=context_used,
-    # )
+    print(f"Context used: {ai_response}")
+
+    return AIChatResponse(
+        response=ai_response,
+        emotion=emotion,
+        suggested_actions=suggested_actions,
+        context_used=context_used,
+    )
 
 
 @router.get("/insights/{session_id}", response_model=ChatInsightsResponse)

@@ -3,6 +3,7 @@ from datetime import datetime
 from datetime import date as Date
 from typing import Optional
 from enum import Enum
+from ..utils.Toneenum import ToneEnum
 
 
 class ActivityCategory(str, Enum):
@@ -38,8 +39,8 @@ class ClosureActivity(SQLModel, table=True):
 class AIPersonality(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="user.id", index=True, unique=True)
-    tone: str = Field(
-        max_length=50, default="supportive"
+    tone: ToneEnum = Field(
+        max_length=50, default=ToneEnum.SUPPORTIVE
     )  # supportive, empathetic, challenging, etc.
     mood: str = Field(max_length=50, default="gentle")  # gentle, direct, playful, etc.
     ex_name: Optional[str] = Field(default=None, max_length=100)
